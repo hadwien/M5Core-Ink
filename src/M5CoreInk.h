@@ -12,6 +12,8 @@
 #include "utility/Ink_Sprite.h"
 #include "utility/Speaker.h"
 
+#include "utility/Power_Class.h"
+
 class M5CoreInk {
    private:
     /* data */
@@ -40,6 +42,7 @@ class M5CoreInk {
     SPEAKER Speaker;
     RTC rtc;
     Ink_eSPI M5Ink;
+    Power_Class Power;
 };
 
 extern M5CoreInk M5;
