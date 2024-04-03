@@ -41,3 +41,9 @@ int Power_Class::getBatteryLevel(void) {
 
     return (level < 0) ? 0 : (level >= 100) ? 100 : level;
 }
+
+int Power_Class::getBatteryLevel(int battery_v) {
+    int level = (battery_v - 3300) * 100 / (float)(4150 - 3350);
+
+    return (level < 0) ? 0 : (level >= 100) ? 100 : level;
+}

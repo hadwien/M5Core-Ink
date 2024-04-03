@@ -18,6 +18,7 @@ class Power_Class {
     int getBatteryVoltage(void);
 
     int getBatteryLevel(void);
+    int getBatteryLevel(int battery_v);
 
    private:
     float _adc_ratio = 0;

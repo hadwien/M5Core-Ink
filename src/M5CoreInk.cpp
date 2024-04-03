@@ -8,6 +8,7 @@ M5CoreInk::~M5CoreInk() {
 
 int M5CoreInk::begin(bool InkEnable, bool wireEnable, bool SpeakerEnable) {
     Power.begin();
+    Data.begin();
 
     pinMode(POWER_HOLD_PIN, OUTPUT);
     digitalWrite(POWER_HOLD_PIN, HIGH);  // Hold power

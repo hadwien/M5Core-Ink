@@ -13,7 +13,6 @@
 #include "utility/Speaker.h"
 
 #include "utility/Power_Class.h"
-#include "utility/Data_Class.h"
 
 class M5CoreInk {
    private:
