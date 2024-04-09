@@ -11,6 +11,6 @@
     "url": "https://github.com/m5stack/M5Core-Ink.git"
   },
   "version": "1.0.0",
-  "frameworks": "arduino",
+  "frameworks": "espidf",
   "platforms": "espressif32"
 }

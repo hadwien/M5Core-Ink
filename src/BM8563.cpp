@@ -1,16 +1,16 @@
 #include "BM8563.h"
 
-RTC::RTC() {
+RTC::RTC() : _i2c() {
 }
 
 void RTC::begin(void) {
-    _i2c.begin(&Wire1, 21, 22);
-    _i2c.writeByte(BM8563_I2C_ADDR, 0x00, 0x00);
-    _i2c.writeByte(BM8563_I2C_ADDR, 0x0E, 0x03);
+    _i2c.begin(GPIO_NUM_21, GPIO_NUM_22, BM8563_I2C_ADDR);
+    _i2c.writeByte(0x00, 0x00);
+    _i2c.writeByte(0x0E, 0x03);
 }
 
 void RTC::GetBm8563Time(void) {
-    if (_i2c.readBytes(BM8563_I2C_ADDR, 0x02, trdata, 7)) {
+    if (_i2c.readBytes(0x02, _trdata, 7) == ESP_OK) {
         DataMask();
         Bcd2asc();
         Str2Time();
@@ -31,30 +31,25 @@ void RTC::Str2Time(void) {
 }
 
 void RTC::DataMask() {
-    trdata[0] = trdata[0] & 0x7f;  // 秒
-    trdata[1] = trdata[1] & 0x7f;  // 分
-    trdata[2] = trdata[2] & 0x3f;  // 时
+    _trdata[0] = _trdata[0] & 0x7f;  // 秒
+    _trdata[1] = _trdata[1] & 0x7f;  // 分
+    _trdata[2] = _trdata[2] & 0x3f;  // 时
 
-    trdata[3] = trdata[3] & 0x3f;  // 日
-    trdata[4] = trdata[4] & 0x07;  // 星期
-    trdata[5] = trdata[5] & 0x1f;  // 月
+    _trdata[3] = _trdata[3] & 0x3f;  // 日
+    _trdata[4] = _trdata[4] & 0x07;  // 星期
+    _trdata[5] = _trdata[5] & 0x1f;  // 月
 
-    trdata[6] = trdata[6] & 0xff;  // 年
+    _trdata[6] = _trdata[6] & 0xff;  // 年
 }
 /********************************************************************
-函 数 名： void Bcd2asc(void)
-功 能： bcd 码转换成 asc 码，供Lcd显示用
-说 明：
-调 用：
-入口参数：
-返 回 值：无
+ void Bcd2asc(void)
+
 ***********************************************************************/
 void RTC::Bcd2asc(void) {
     uint8_t i, j;
     for (j = 0, i = 0; i < 7; i++) {
-        asc[j++] =
-            (trdata[i] & 0xf0) >> 4 | 0x30; /*格式为: 秒 分 时 日 月 星期 年 */
-        asc[j++] = (trdata[i] & 0x0f) | 0x30;
+        asc[j++] = (_trdata[i] & 0xf0) >> 4 | 0x30;
+        asc[j++] = (_trdata[i] & 0x0f) | 0x30;
     }
 }
 
@@ -63,16 +58,16 @@ uint8_t RTC::bcd2ToByte(uint8_t value) {
 }
 
 uint8_t RTC::byteToBcd2(uint8_t value) {
-    std::uint_fast8_t bcdhigh = value / 10;
+    uint_fast8_t bcdhigh = value / 10;
     return (bcdhigh << 4) | (value - (bcdhigh * 10));
 }
 
 void RTC::GetTime(RTC_TimeTypeDef *RTC_TimeStruct) {
     uint8_t buf[3] = {0};
-    if (_i2c.readBytes(BM8563_I2C_ADDR, 0x02, buf, 3)) {
-        RTC_TimeStruct->Seconds = bcd2ToByte(buf[0] & 0x7f);  // 秒
-        RTC_TimeStruct->Minutes = bcd2ToByte(buf[1] & 0x7f);  // 分
-        RTC_TimeStruct->Hours   = bcd2ToByte(buf[2] & 0x3f);  // 时
+    if (_i2c.readBytes(0x02, buf, 3) == ESP_OK) {
+        RTC_TimeStruct->Seconds = bcd2ToByte(buf[0] & 0x7f);
+        RTC_TimeStruct->Minutes = bcd2ToByte(buf[1] & 0x7f);
+        RTC_TimeStruct->Hours   = bcd2ToByte(buf[2] & 0x3f);
     }
 }
 
@@ -83,12 +78,12 @@ void RTC::SetTime(RTC_TimeTypeDef *RTC_TimeStruct) {
                      byteToBcd2(RTC_TimeStruct->Minutes),
                      byteToBcd2(RTC_TimeStruct->Hours)};
 
-    _i2c.writeBytes(BM8563_I2C_ADDR, 0x02, buf, sizeof(buf));
+    _i2c.writeBytes(0x02, buf, sizeof(buf));
 }
 
 void RTC::GetDate(RTC_DateTypeDef *RTC_DateStruct) {
     uint8_t buf[4] = {0};
-    if (_i2c.readBytes(BM8563_I2C_ADDR, 0x05, buf, 4)) {
+    if (_i2c.readBytes(0x05, buf, 4) == ESP_OK) {
         RTC_DateStruct->Date    = bcd2ToByte(buf[0] & 0x3f);
         RTC_DateStruct->WeekDay = bcd2ToByte(buf[1] & 0x07);
         RTC_DateStruct->Month   = bcd2ToByte(buf[2] & 0x1f);
@@ -102,24 +97,25 @@ void RTC::SetDate(RTC_DateTypeDef *RTC_DateStruct) {
 
     uint8_t buf[] = {byteToBcd2(RTC_DateStruct->Date),
                      byteToBcd2(RTC_DateStruct->WeekDay),
-                     (std::uint8_t)(byteToBcd2(RTC_DateStruct->Month) +
-                                    (RTC_DateStruct->Year < 2000 ? 0x80 : 0)),
+                     (uint8_t)(byteToBcd2(RTC_DateStruct->Month) +
+                               (RTC_DateStruct->Year < 2000 ? 0x80 : 0)),
                      byteToBcd2(RTC_DateStruct->Year % 100)};
 
-    _i2c.writeBytes(BM8563_I2C_ADDR, 0x05, buf, sizeof(buf));
+    _i2c.writeBytes(0x05, buf, sizeof(buf));
 }
 
 int RTC::SetAlarmIRQ(int afterSeconds) {
-    std::uint8_t reg_value = _i2c.readByte(BM8563_I2C_ADDR, 0x01) & ~0x0C;
-
+    uint8_t reg_value = 0U;
+    _i2c.readByte(0x01, &reg_value);
+    reg_value = reg_value & ~0x0C;
     if (afterSeconds < 0) {  // disable timer
-        _i2c.writeByte(BM8563_I2C_ADDR, 0x01, reg_value & ~0x01);
-        _i2c.writeByte(BM8563_I2C_ADDR, 0x0E, 0x03);
+        _i2c.writeByte(0x01, reg_value & ~0x01);
+        _i2c.writeByte(0x0E, 0x03);
         return -1;
     }
 
-    std::size_t div         = 1;
-    std::uint8_t type_value = 0x82;
+    size_t div         = 1;
+    uint8_t type_value = 0x82;
     if (afterSeconds < 270) {
         if (afterSeconds > 255) {
             afterSeconds = 255;
@@ -133,9 +129,9 @@ int RTC::SetAlarmIRQ(int afterSeconds) {
         type_value = 0x83;
     }
 
-    _i2c.writeByte(BM8563_I2C_ADDR, 0x0E, type_value);
-    _i2c.writeByte(BM8563_I2C_ADDR, 0x0F, afterSeconds);
-    _i2c.writeByte(BM8563_I2C_ADDR, 0x01, (reg_value | 0x01) & ~0x80);
+    _i2c.writeByte(0x0E, type_value);
+    _i2c.writeByte(0x0F, afterSeconds);
+    _i2c.writeByte(0x01, (reg_value | 0x01) & ~0x80);
     return afterSeconds * div;
 }
 
@@ -156,7 +152,8 @@ int RTC::SetAlarmIRQ(const RTC_TimeTypeDef &RTC_TimeStruct) {
     out_buf[2] = 0x80;
     out_buf[3] = 0x80;
 
-    uint8_t reg_value = _i2c.readByte(BM8563_I2C_ADDR, 0x01);
+    uint8_t reg_value = 0U;
+    _i2c.readByte(0x01, &reg_value);
 
     if (irq_enable) {
         reg_value |= (1 << 1);
@@ -165,9 +162,9 @@ int RTC::SetAlarmIRQ(const RTC_TimeTypeDef &RTC_TimeStruct) {
     }
 
     for (int i = 0; i < 4; i++) {
-        _i2c.writeByte(BM8563_I2C_ADDR, 0x09 + i, out_buf[i]);
+        _i2c.writeByte(0x09 + i, out_buf[i]);
     }
-    _i2c.writeByte(BM8563_I2C_ADDR, 0x01, reg_value);
+    _i2c.writeByte(0x01, reg_value);
 
     return irq_enable ? 1 : 0;
 }
@@ -197,7 +194,8 @@ int RTC::SetAlarmIRQ(const RTC_DateTypeDef &RTC_DateStruct,
         out_buf[3] = byteToBcd2(RTC_DateStruct.WeekDay) & 0x07;
     }
 
-    uint8_t reg_value = _i2c.readByte(BM8563_I2C_ADDR, 0x01);
+    uint8_t reg_value = 0U;
+    _i2c.readByte(0x01, &reg_value);
 
     if (irq_enable) {
         reg_value |= (1 << 1);
@@ -206,25 +204,25 @@ int RTC::SetAlarmIRQ(const RTC_DateTypeDef &RTC_DateStruct,
     }
 
     for (int i = 0; i < 4; i++) {
-        _i2c.writeByte(BM8563_I2C_ADDR, 0x09 + i, out_buf[i]);
+        _i2c.writeByte(0x09 + i, out_buf[i]);
     }
-    _i2c.writeByte(BM8563_I2C_ADDR, 0x01, reg_value);
+    _i2c.writeByte(0x01, reg_value);
 
     return irq_enable ? 1 : 0;
 }
 
 void RTC::clearIRQ() {
-    _i2c.writeBitOff(BM8563_I2C_ADDR, 0x01, 0x0C);
+    _i2c.writeBitOff(0x01, 0x0C);
 }
 
 void RTC::disableIRQ() {
-    // disable alerm (bit7:1=disabled)
-    static constexpr const std::uint8_t buf[4] = {0x80, 0x80, 0x80, 0x80};
-    _i2c.writeBytes(BM8563_I2C_ADDR, 0x09, (uint8_t *)buf, 4);
+    // disable alarm (bit7:1=disabled)
+    static constexpr const uint8_t buf[4] = {0x80, 0x80, 0x80, 0x80};
+    _i2c.writeBytes(0x09, (uint8_t *)buf, 4);
 
     // disable timer (bit7:0=disabled)
-    _i2c.writeByte(BM8563_I2C_ADDR, 0x0E, 0);
+    _i2c.writeByte(0x0E, 0);
 
     // clear flag and INT enable bits
-    _i2c.writeByte(BM8563_I2C_ADDR, 0x01, 0x00);
+    _i2c.writeByte(0x01, 0x00);
 }
